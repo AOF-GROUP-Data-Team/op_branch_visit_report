@@ -1,0 +1,51 @@
+name: Branch Visit Report (1786228)
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "Report date YYYY-MM-DD (empty = yesterday, KSA)"
+        required: false
+        default: ""
+      send_email:
+        description: "Send the email"
+        type: choice
+        options: ["true", "false"]
+        default: "true"
+  schedule:
+    - cron: "0 6 * * *"   # fallback only: 09:00 KSA
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests Pillow playwright
+          python -m playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-core fonts-noto-ui-core
+
+      - name: Run report
+        env:
+          ZENPUT_API_KEY: ${{ secrets.ZENPUT_API_KEY }}
+          GMAIL_PASS:     ${{ secrets.GMAIL_PASS }}
+          REPORT_DATE:    ${{ github.event.inputs.report_date }}
+          SEND_EMAIL:     ${{ github.event.inputs.send_email || 'true' }}
+        run: python branch_visit_report_1786228.py
+
+      - name: Upload PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-visit-report
+          path: |
+            branch_visits_report_*.pdf
+            branch_visits_*.html
+          if-no-files-found: ignore
